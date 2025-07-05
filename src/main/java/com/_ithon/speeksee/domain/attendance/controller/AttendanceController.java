@@ -20,11 +20,13 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/attendance")
 @RequiredArgsConstructor
+@Tag(name = "출석체크", description = "출석체크 페이지에서 출석을 조회합니다.")
 public class AttendanceController {
 	private final AttendanceService attendanceService;
 
@@ -42,17 +44,21 @@ public class AttendanceController {
 				examples = @ExampleObject(
 					name = "성공 예시",
 					value = """
-						{
-						  "status": 200,
-						  "message": "출석체크 조회",
-						  "data": {
-						    "year": 2025,
-						    "month": 7,
-						    "attendanceDates": [
-						      "2025-07-05"
-						    ]
-						  }
-						}
+							{
+								 "success": true,
+								 "data": {
+									 "year": 2025,
+									 "month": 7,
+									 "attendanceDates": [
+										 "2025-07-05",
+										 "2025-07-06"
+									 ]
+								 },
+								 "message": "출석체크 조회",
+								 "status": 200,
+								 "code": 0,
+								 "time": "2025-07-06T02:13:21.2320679"
+							 }
 						"""
 				)
 			)
@@ -66,6 +72,6 @@ public class AttendanceController {
 	) {
 		Member member = userDetails.getMember();
 		AttendanceStatusResponseDto dto = attendanceService.getMonthlyAttendance(member, year, month);
-		return ResponseEntity.ok(ApiRes.success(dto, "출석체크 조회"));
+		return ResponseEntity.ok(ApiRes.success(dto, "출석체크 조회 성공"));
 	}
 }
