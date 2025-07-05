@@ -1,6 +1,8 @@
 package com._ithon.speeksee.global.auth.jwt;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
@@ -17,7 +19,9 @@ import com._ithon.speeksee.domain.member.dto.response.MemberInfoResponseDto;
 import com._ithon.speeksee.domain.member.entity.Member;
 import com._ithon.speeksee.global.auth.dto.request.LoginRequestDto;
 import com._ithon.speeksee.global.auth.dto.response.LoginResponseDto;
+import com._ithon.speeksee.global.auth.entity.RefreshToken;
 import com._ithon.speeksee.global.auth.model.CustomUserDetails;
+import com._ithon.speeksee.global.auth.repository.RefreshTokenRepository;
 import com._ithon.speeksee.global.infra.exception.code.ErrorCode;
 import com._ithon.speeksee.global.infra.exception.response.ApiRes;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,7 +33,7 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 public class LoginFilter extends UsernamePasswordAuthenticationFilter {
-
+	private final RefreshTokenRepository refreshTokenRepository;
 	private final AuthenticationManager authenticationManager;
 	private final JwtTokenProvider jwtTokenProvider;
 	private final ObjectMapper objectMapper;
@@ -55,43 +59,26 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
 		FilterChain chain, Authentication authResult) throws IOException {
 
 		CustomUserDetails userDetails = (CustomUserDetails)authResult.getPrincipal();
-
+		Member member = userDetails.getMember();
 		String email = userDetails.getUsername(); // 이메일값임
-		String username = authResult.getName();
 
+		// 토큰 생성
 		String accessToken = jwtTokenProvider.generateAccessToken(email);
 		String refreshToken = jwtTokenProvider.generateRefreshToken(email);
 		long expiresIn = jwtTokenProvider.getAccessTokenExpirationMs(); // 예: 3600초
 
-		Member member = userDetails.getMember();
+		// 리프레쉬 토큰 저장
+		RefreshToken refreshTokenEntity = buildRefreshTokenEntity(refreshToken, member);
+		refreshTokenRepository.save(refreshTokenEntity);
 
-		// 출석체크
-		attendanceService.attend(member);
+		// 응답 DTO
+		MemberInfoResponseDto memberInfo = buildMemberInfoDto(member);
+		LoginResponseDto loginResponse = buildLoginResponseDto(accessToken, refreshToken, expiresIn,
+			memberInfo);
+		ApiRes<LoginResponseDto> apiResponse = ApiRes.success(loginResponse, "로그인 성공");
 
-		MemberInfoResponseDto memberInfo = MemberInfoResponseDto.builder()
-			.userId(member.getId())
-			.email(member.getEmail())
-			.username(member.getUsername())
-			.currentLevel(member.getCurrentLevel())
-			.consecutiveDays(member.getConsecutiveDays())
-			.totalExp(member.getTotalExp())
-			.build();
-
-		// ✅ 로그인 응답 DTO 생성
-		LoginResponseDto loginResponse = LoginResponseDto.builder()
-			.accessToken(accessToken)
-			.refreshToken(refreshToken)
-			.expiresIn(expiresIn)
-			.memberInfo(memberInfo)
-			.build();
-
-		// ✅ API 응답 포맷에 맞게 감싸기
-		ApiRes<LoginResponseDto> apiRes = ApiRes.success(loginResponse, "로그인 성공");
-
-		// 🔽 응답 전송
-		response.setStatus(HttpServletResponse.SC_OK);
-		response.setContentType("application/json; charset=UTF-8");
-		objectMapper.writeValue(response.getWriter(), apiRes);
+		// 응답 전송
+		writeJsonResponse(response, apiResponse);
 	}
 
 	@Override
@@ -116,6 +103,45 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
 
 		response.setContentType("application/json; charset=UTF-8");
 		response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+	}
+
+	private RefreshToken buildRefreshTokenEntity(String token, Member member) {
+		LocalDateTime expiryDate = LocalDateTime.now()
+			.plus(Duration.ofMillis(jwtTokenProvider.getRefreshTokenExpirationMs()));
+		return RefreshToken.builder()
+			.member(member)
+			.token(token)
+			.used(false)
+			.expiryDate(expiryDate)
+			.build();
+	}
+
+	private MemberInfoResponseDto buildMemberInfoDto(Member member) {
+		return MemberInfoResponseDto.builder()
+			.userId(member.getId())
+			.email(member.getEmail())
+			.username(member.getUsername())
+			.currentLevel(member.getCurrentLevel())
+			.consecutiveDays(member.getConsecutiveDays())
+			.totalExp(member.getTotalExp())
+			.createdAt(member.getCreatedAt())
+			.build();
+	}
+
+	private LoginResponseDto buildLoginResponseDto(String accessToken, String refreshToken,
+		long expiresIn, MemberInfoResponseDto memberInfo) {
+		return LoginResponseDto.builder()
+			.accessToken(accessToken)
+			.refreshToken(refreshToken)
+			.expiresIn(expiresIn)
+			.memberInfo(memberInfo)
+			.build();
+	}
+
+	private void writeJsonResponse(HttpServletResponse response, Object body) throws IOException {
+		response.setStatus(HttpServletResponse.SC_OK);
+		response.setContentType("application/json; charset=UTF-8");
+		objectMapper.writeValue(response.getWriter(), body);
 	}
 
 }

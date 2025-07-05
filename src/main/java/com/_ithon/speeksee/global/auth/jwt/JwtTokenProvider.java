@@ -99,6 +99,10 @@ public class JwtTokenProvider {
 		return accessTokenValidTime; // application.yml 에서 주입받은 값
 	}
 
+	public long getRefreshTokenExpirationMs() {
+		return refreshTokenValidTime; // application.yml 에서 주입받은 값
+	}
+
 	// 쿠키에서 refreshToken을 꺼내오는 메서드
 	public String resolveRefreshToken(HttpServletRequest request) {
 		Cookie[] cookies = request.getCookies();

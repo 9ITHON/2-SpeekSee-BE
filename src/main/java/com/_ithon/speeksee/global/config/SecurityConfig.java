@@ -23,6 +23,7 @@ import com._ithon.speeksee.domain.attendance.service.AttendanceService;
 import com._ithon.speeksee.global.auth.jwt.JwtAuthenticationFilter;
 import com._ithon.speeksee.global.auth.jwt.JwtTokenProvider;
 import com._ithon.speeksee.global.auth.jwt.LoginFilter;
+import com._ithon.speeksee.global.auth.repository.RefreshTokenRepository;
 import com._ithon.speeksee.global.auth.service.CustomUserDetailsService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -31,6 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class SecurityConfig {
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
+	private final RefreshTokenRepository refreshTokenRepository;
 
 	//    private final JWTUtil jwtUtil;
 	private final ObjectMapper objectMapper;
@@ -57,7 +59,7 @@ public class SecurityConfig {
 	public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationManager authManager) throws
 		Exception {
 
-		LoginFilter loginFilter = new LoginFilter(authManager, jwtTokenProvider, objectMapper, attendanceService);
+		LoginFilter loginFilter = new LoginFilter(refreshTokenRepository, authManager, jwtTokenProvider, objectMapper, attendanceService);
 		loginFilter.setFilterProcessesUrl("/api/auth/login");
 
 		http
